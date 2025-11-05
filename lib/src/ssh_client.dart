@@ -1038,3 +1038,46 @@ class SSHRemoteForward {
   @override
   String toString() => '$runtimeType($host:$port)';
 }
+extension SSHClientWithOtp on SSHClient {
+  Future<void> authPasswordWithOtp(
+    String username,
+    String password, {
+    Future<String> Function(String prompt)? onOtpPrompt,
+  }) async {
+    try {
+      await authPassword(username, password);
+    } on SSHAuthFailError {
+      if (onOtpPrompt != null) {
+        final otp = await onOtpPrompt('Enter OTP:');
+        await authKeyboardInteractive(
+          username,
+          (name, instructions, prompts) async {
+            final responses = <String>[];
+            for (final prompt in prompts) {
+              final lower = prompt.toLowerCase();
+              if (lower.contains('otp') || lower.contains('token')) {
+                responses.add(otp);
+              } else if (lower.contains('password')) {
+                responses.add(password);
+              } else {
+                responses.add('');
+              }
+            }
+            return responses;
+          },
+        );
+      } else {
+        rethrow;
+      }
+    }
+  }
+}
+
+extension SSHClientForwardSocket on SSHClient {
+  Future<SSHForwardSocket> forwardSocket(String host, int port) async {
+    final channel = await forwardLocal(host, port);
+    return SSHForwardSocket(channel);
+  }
+}
+
+
