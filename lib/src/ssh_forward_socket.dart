@@ -1,36 +1,30 @@
-import 'dart:async';
+import 'dart:convert';
 import 'package:dartssh2/dartssh2.dart';
 
-/// ===========================================================
-///  Classe SSHForwardSocket: usa un canale SSH come socket TCP
-/// ===========================================================
+/// Wrapper socket for forwarding via SSH
 class SSHForwardSocket {
   final SSHForwardChannel _channel;
-  final StreamController<List<int>> _controller = StreamController();
 
-  SSHForwardSocket(this._channel) {
-    _channel.stream.listen(
-      (data) {
-        _controller.add(data);
-      },
-      onDone: () {
-        _controller.close();
-      },
-    );
+  SSHForwardSocket(this._channel);
+
+  /// Stream of received  byte
+  Stream<List<int>> get stream => _channel.stream;
+
+  /// Write  data into the  channel
+  void write(String data) {
+    _channel.sink.add(utf8.encode(data));
   }
 
-  /// Stream dei dati ricevuti
-  Stream<List<int>> get stream => _controller.stream;
-
-  /// Invia dati binari
-  void add(List<int> data) => _channel.sink.add(data);
-
-  /// Invia una stringa
-  void write(String message) => _channel.sink.add(message.codeUnits);
-
-  /// Chiude il tunnel
+  /// Cloese la connection
   Future<void> close() async {
     await _channel.sink.close();
-    await _controller.close();
+  }
+}
+
+/// Extention to create a forward tunnel as socket
+extension SSHForwardSocketExtension on SSHClient {
+  Future<SSHForwardSocket> forwardSocket(String host, int port) async {
+    final channel = await forwardLocal(host, port);
+    return SSHForwardSocket(channel);
   }
 }
